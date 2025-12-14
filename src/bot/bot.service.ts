@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { Context } from 'telegraf';
+import { BotContext } from './context/bot.context';
 
 interface UserRegistrationData {
     chatId: bigint;
@@ -93,5 +95,93 @@ export class BotService {
             }
         }
     });
+  }
+  
+  async checkUserSubscriptions(ctx: Context, channels) {
+  const chatId = ctx.from?.id;
+  if (!chatId) return [];
+
+  const subscriptions: string[] = [];
+
+  for (const channel of channels) {
+    try {
+      const member = await ctx.telegram.getChatMember(channel.username, chatId);
+      if (['member', 'administrator', 'creator'].includes(member.status)) {
+        subscriptions.push(channel.username);
+      }
+    } catch (err) {
+      console.log(err)
+    }
+  }
+
+  return subscriptions;
+  }
+  async scorePlace(userId: bigint, test_id: number) {
+  const queue = await this.prisma.testSubmission.findMany({
+    where: { testId: test_id },
+    orderBy: { score: 'desc' }
+  });
+
+  for (let i = 0; i < queue.length; i++) {
+    if (queue[i].userId === userId) {
+      return i + 1; // 
+    }
+  }
+
+  return null; 
 }
+
+
+  async getUserSubmission(userChatId: bigint, testId: number) {
+  const user = await this.prisma.user.findUnique({ where: { chatId: userChatId } });
+  if (!user) return null;
+  return this.prisma.testSubmission.findUnique({ where: { testId_userId: { testId, userId: user.chatId } } });
+}
+
+async saveTestSubmission(data: { testId: number; userId: any; answers: string; score: number }) {
+  return this.prisma.testSubmission.create({ data});
+}
+ 
+  
+  // ======ADMIN=====
+  async isAdmin(chatId: bigint): Promise<boolean> {
+  const user = await this.prisma.user.findUnique({
+    where: { chatId },
+    select: { role: true },
+  });
+
+  return user?.role === 'ADMIN';
+  }
+  
+  async createTest(data: {
+  code: string;
+  correctAnswers: string;
+  startTime: Date;
+  endTime: Date;
+  createdByChatId: bigint;
+}) {
+  const admin = await this.prisma.user.findUnique({
+    where: { chatId: data.createdByChatId },
+  });
+
+  if (!admin) {
+    throw new Error('Admin topilmadi');
+  }
+
+  return this.prisma.test.create({
+    data: {
+      code: data.code,
+      correctAnswers: data.correctAnswers.toUpperCase(),
+      startTime: data.startTime,
+      endTime: data.endTime,
+      createdById: admin.id,
+    },
+  });
+}
+
+async getTestByCode(code: string) {
+  return this.prisma.test.findUnique({ where: { code } });
+}
+
+
 }

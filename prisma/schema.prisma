@@ -1,4 +1,3 @@
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,38 +6,71 @@ datasource db {
   provider = "postgresql"
 }
 
-
-
-
+enum Role {
+  ADMIN
+  USER
+}
 
 model User {
-  id Int @id @default(autoincrement())
-  chatId      BigInt @unique
-  name String
-  age String
-  phone String
+  id         Int      @id @default(autoincrement())
+  chatId     BigInt   @unique
+  name       String
+  age        String
+  phone      String
   regionId   Int
   districtId Int
-  createdAt   DateTime @default(now())
-
-  region     Region    @relation(fields: [regionId], references: [id])
-  district   District  @relation(fields: [districtId], references: [id])
-
+  createdAt  DateTime @default(now())
+  district   District @relation(fields: [districtId], references: [id])
+  region     Region   @relation(fields: [regionId], references: [id])
+  role       Role     @default(USER)
+  submissions TestSubmission[]
+  createdTests Test[]   
 }
 
 model Region {
   id        Int        @id @default(autoincrement())
   name      String
   districts District[]
-  user User[]
+  user      User[]
 }
 
 model District {
-  id        Int      @id @default(autoincrement())
-  name      String
-  regionId  Int
-  region    Region   @relation(fields: [regionId], references: [id])
+  id       Int    @id @default(autoincrement())
+  name     String
+  regionId Int
+  region   Region @relation(fields: [regionId], references: [id])
+  user     User[]
+}
 
-  user User[]
+model Test {
+  id             Int      @id @default(autoincrement())
+  code           String   @unique    
+  correctAnswers String              
+
+  startTime      DateTime
+  endTime        DateTime
+
+  createdById    Int
+  createdBy      User     @relation(fields: [createdById], references: [id])
+  submissions    TestSubmission[]
+
+  createdAt      DateTime @default(now())
+}
+
+model TestSubmission {
+  id          Int      @id @default(autoincrement())
+
+  testId      Int
+  test        Test     @relation(fields: [testId], references: [id])
+
+  userId      BigInt
+  user        User     @relation(fields: [userId], references: [chatId])
+
+  answers     String  
+  score       Int
+
+  submittedAt DateTime @default(now())
+
+  @@unique([testId, userId]) 
 }
 
