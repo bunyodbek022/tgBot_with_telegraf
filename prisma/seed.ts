@@ -1,7 +1,8 @@
 import { NestFactory } from '@nestjs/core';
 import { SeedModule } from './seed.module';
 import { PrismaService } from 'src/prisma/prisma.service';
-
+import * as dotenv from 'dotenv';
+dotenv.config();
 class Seeder {
   constructor(private readonly prisma: PrismaService) {}
   async run() {
@@ -270,10 +271,13 @@ class Seeder {
       console.log(`Created region: ${createdRegion.name}`);
     }
   }
-
 }
 
 async function bootstrap() {
+  console.log(
+    'DB URL:',
+    process.env.DATABASE_URL ? 'Topildi ✅' : 'Topilmadi ❌',
+  );
   const app = await NestFactory.createApplicationContext(SeedModule);
   const prismaService = app.get(PrismaService);
 
