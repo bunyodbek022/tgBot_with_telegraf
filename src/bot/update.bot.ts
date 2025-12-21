@@ -1,11 +1,18 @@
 import { Action, Ctx, On, Start, Update } from 'nestjs-telegraf';
 import { BotContext } from './context/bot.context';
 import { BotService } from './bot.service';
-import {
-  InlineKeyboardMarkup,
-  ReplyKeyboardMarkup,
-  ReplyKeyboardRemove,
-} from 'telegraf/types';
+import { InlineKeyboardMarkup, ReplyKeyboardRemove } from 'telegraf/types';
+import dayjs from 'dayjs';
+import customParseFormat from 'dayjs/plugin/customParseFormat';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+
+dayjs.extend(customParseFormat);
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+const TASHKENT_TZ = 'Asia/Tashkent';
+
 @Update()
 export class BotUpdate {
   constructor(private readonly botService: BotService) {}
@@ -123,12 +130,29 @@ export class BotUpdate {
         return;
       }
 
+      const startTime = dayjs.tz(
+        ctx.session.startTime,
+        'YYYY-MM-DD HH:mm',
+        TASHKENT_TZ,
+      );
+
+      const endTime = dayjs.tz(
+        ctx.session.endTime,
+        'YYYY-MM-DD HH:mm',
+        TASHKENT_TZ,
+      );
+
+      if (!startTime.isValid() || !endTime.isValid()) {
+        await ctx.reply('❌ Vaqt formati notogri. YYYY-MM-DD HH:mm');
+        return;
+      }
+
       try {
         const test = await this.botService.createTest({
           code: ctx.session.testCode,
           correctAnswers: ctx.session.correctAnswers,
-          startTime: new Date(ctx.session.startTime),
-          endTime: new Date(ctx.session.endTime),
+          startTime: startTime.toDate(), 
+          endTime: endTime.toDate(),
           createdByChatId: BigInt(chatId),
         });
 
@@ -136,8 +160,8 @@ export class BotUpdate {
           '@full_stack_with_Bunyodbek',
           `📝 YANGI TEST E'LON QILINDI\n\n` +
             `🆔 Test kodi: ${test.code}\n` +
-            `⏰ Boshlanish: ${test.startTime.toLocaleString()}\n` +
-            `⏰ Tugash: ${test.endTime.toLocaleString()}\n\n` +
+            `⏰ Boshlanish: ${test.startTime.toLocaleString('en-US', { timeZone: 'Asia/Tashkent' })}\n` +
+            `⏰ Tugash: ${test.endTime.toLocaleString('en-US', { timeZone: 'Asia/Tashkent' })}\n\n` +
             `Javob yuborish formati:\n` +
             `${test.code}-ABCDA...`,
         );
@@ -197,13 +221,12 @@ export class BotUpdate {
       const now = new Date();
       if (now < test.startTime) {
         await ctx.reply('❌ Test hali boshlanmadi.');
-        return
+        return;
       }
       if (now > test.endTime) {
         await ctx.reply('❌ Test topshirish vaqti tugagan.');
-        return
+        return;
       }
-
 
       const existingSubmission = await this.botService.getUserSubmission(
         userId,
